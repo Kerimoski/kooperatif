@@ -85,6 +85,37 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       WHERE status = 'pending'
     `;
 
+    // Belge istatistikleri
+    const documentStatsQuery = `
+      SELECT 
+        COUNT(*) as total_documents,
+        COUNT(CASE WHEN uploaded_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as new_documents_this_month,
+        SUM(file_size) as total_size,
+        COUNT(DISTINCT category) as categories_count
+      FROM documents
+    `;
+
+    // Mail/rapor istatistikleri  
+    const mailStatsQuery = `
+      SELECT 
+        COUNT(*) as total_mails,
+        COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent_mails,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_mails,
+        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as mails_this_month
+      FROM mail_logs
+    `;
+
+    // Ödeme/aidat istatistikleri
+    const feeStatsQuery = `
+      SELECT 
+        COUNT(*) as total_fees,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_fees,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_fees,
+        COUNT(CASE WHEN status = 'overdue' THEN 1 END) as overdue_fees,
+        SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as total_collected
+      FROM membership_fees
+    `;
+
     // Tüm sorguları paralel çalıştır
     const [
       userStatsResult,
@@ -92,14 +123,20 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       monthlyActivityResult,
       commissionDetailsResult,
       recentActivitiesResult,
-      pendingApplicationsResult
+      pendingApplicationsResult,
+      documentStatsResult,
+      mailStatsResult,
+      feeStatsResult
     ] = await Promise.all([
       pool.query(userStatsQuery),
       pool.query(commissionStatsQuery),
       pool.query(monthlyActivityQuery),
       pool.query(commissionDetailsQuery),
       pool.query(recentActivitiesQuery),
-      pool.query(pendingApplicationsQuery)
+      pool.query(pendingApplicationsQuery),
+      pool.query(documentStatsQuery),
+      pool.query(mailStatsQuery),
+      pool.query(feeStatsQuery)
     ]);
 
     const userStats = userStatsResult.rows[0];
@@ -108,6 +145,9 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
     const commissionDetails = commissionDetailsResult.rows;
     const recentActivities = recentActivitiesResult.rows;
     const pendingApplications = parseInt(pendingApplicationsResult.rows[0].pending_count);
+    const documentStats = documentStatsResult.rows[0];
+    const mailStats = mailStatsResult.rows[0];
+    const feeStats = feeStatsResult.rows[0];
 
     // Toplam aylık aktivite hesapla
     const totalMonthlyActivities = 
@@ -120,6 +160,26 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       activeCommissions: parseInt(commissionStats.active_commissions),
       monthlyActivities: totalMonthlyActivities,
       pendingApplications: pendingApplications,
+      
+      // Belge istatistikleri
+      totalDocuments: parseInt(documentStats.total_documents) || 0,
+      newDocumentsThisMonth: parseInt(documentStats.new_documents_this_month) || 0,
+      totalDocumentSize: parseInt(documentStats.total_size) || 0,
+      documentCategories: parseInt(documentStats.categories_count) || 0,
+      
+      // Mail/rapor istatistikleri
+      totalMails: parseInt(mailStats.total_mails) || 0,
+      sentMails: parseInt(mailStats.sent_mails) || 0,
+      failedMails: parseInt(mailStats.failed_mails) || 0,
+      mailsThisMonth: parseInt(mailStats.mails_this_month) || 0,
+      
+      // Ödeme/aidat istatistikleri
+      totalFees: parseInt(feeStats.total_fees) || 0,
+      paidFees: parseInt(feeStats.paid_fees) || 0,
+      pendingFees: parseInt(feeStats.pending_fees) || 0,
+      overdueFees: parseInt(feeStats.overdue_fees) || 0,
+      totalCollected: parseFloat(feeStats.total_collected) || 0,
+      
       usersByRole: {
         admin: parseInt(userStats.admin_count),
         member: parseInt(userStats.member_count)
