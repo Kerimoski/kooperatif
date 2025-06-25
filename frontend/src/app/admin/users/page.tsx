@@ -267,7 +267,7 @@ export default function UsersPage() {
       const formData = new FormData();
       formData.append('excel', excelFile);
 
-      const response = await fetch('http://localhost:5001/api/auth/users/excel-import', {
+      const response = await fetch('${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`/auth/users/excel-import', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

@@ -57,7 +57,7 @@ export default function AdminDocuments() {
       const token = localStorage.getItem('token');
       console.log('Token:', token ? 'mevcut' : 'yok');
       
-      const response = await fetch('http://localhost:5001/api/documents', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -99,7 +99,7 @@ export default function AdminDocuments() {
       formData.append('title', uploadData.title);
       formData.append('category', uploadData.category);
 
-      const response = await fetch('http://localhost:5001/api/documents', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -128,7 +128,7 @@ export default function AdminDocuments() {
     if (!confirm('Bu belgeyi silmek istediğinizden emin misiniz?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5001/api/documents/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

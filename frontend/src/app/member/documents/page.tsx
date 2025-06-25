@@ -47,7 +47,7 @@ export default function MemberDocuments() {
       const token = localStorage.getItem('token');
       console.log('Token:', token ? 'mevcut' : 'yok');
       
-      const response = await fetch('http://localhost:5001/api/documents', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -90,7 +90,7 @@ export default function MemberDocuments() {
 
   const handlePreview = async (document: Document) => {
     try {
-      const response = await fetch(`http://localhost:5001/api/documents/file/${document.file_name}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents/file/${document.file_name}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

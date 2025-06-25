@@ -77,7 +77,7 @@ export default function ReportsPage() {
       setLoading(true);
       
       // Dashboard istatistiklerini yükle
-      const dashboardResponse = await fetch('http://localhost:5001/api/dashboard/stats', {
+      const dashboardResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`'}/dashboard/stats`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -90,7 +90,7 @@ export default function ReportsPage() {
       const dashboardData = await dashboardResponse.json();
       
       // Belge istatistiklerini yükle
-      const documentsResponse = await fetch('http://localhost:5001/api/documents', {
+      const documentsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`'}/documents`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -236,7 +236,7 @@ export default function ReportsPage() {
       
       switch (type) {
         case 'users':
-          const usersResponse = await fetch('http://localhost:5001/api/dashboard/users', {
+          const usersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`'}/dashboard/users`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (usersResponse.ok) {
@@ -256,7 +256,7 @@ export default function ReportsPage() {
           break;
           
         case 'commissions':
-          const commissionsResponse = await fetch('http://localhost:5001/api/commissions', {
+          const commissionsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`'}/commissions`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (commissionsResponse.ok) {
@@ -276,7 +276,7 @@ export default function ReportsPage() {
           break;
           
         case 'documents':
-          const documentsResponse = await fetch('http://localhost:5001/api/documents', {
+          const documentsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`'}/documents`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (documentsResponse.ok) {
