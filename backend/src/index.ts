@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { testConnection } from './config/database';
+import { createDefaultAdmin } from './controllers/authController';
 
 // Route imports
 import authRoutes from './routes/authRoutes';
@@ -82,19 +83,24 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Server başlat
+// Veritabanı bağlantısını test et ve default admin oluştur
 const startServer = async () => {
   try {
     // Veritabanı bağlantısını test et
     await testConnection();
-    
+    console.log('✅ Veritabanı bağlantısı başarılı');
+
+    // Default admin oluştur
+    await createDefaultAdmin();
+
+    // Sunucuyu başlat
     app.listen(PORT, () => {
       console.log(`🚀 Server ${PORT} portunda çalışıyor`);
       console.log(`📚 Health check: http://localhost:${PORT}/api/health`);
       console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
     });
   } catch (error) {
-    console.error('❌ Server başlatılamadı:', error);
+    console.error('❌ Sunucu başlatılırken hata:', error);
     process.exit(1);
   }
 };

@@ -9,6 +9,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password }: LoginData = req.body;
 
+    // Debug için log ekle
+    console.log('🔑 Login attempt:', { email, hasPassword: !!password });
+
     if (!email || !password) {
       res.status(400).json({
         success: false,
@@ -21,7 +24,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const userQuery = 'SELECT * FROM users WHERE email = $1 AND is_active = true';
     const userResult = await pool.query(userQuery, [email]);
 
+    console.log('👤 User query result:', { found: userResult.rows.length > 0, email });
+
     if (userResult.rows.length === 0) {
+      console.log('❌ User not found or inactive');
       res.status(401).json({
         success: false,
         message: 'Geçersiz email veya şifre'
@@ -32,8 +38,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const user = userResult.rows[0];
 
     // Şifre kontrolü
+    console.log('🔒 Password validation starting...');
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('🔒 Password validation result:', isPasswordValid);
+    
     if (!isPasswordValid) {
+      console.log('❌ Password validation failed');
       res.status(401).json({
         success: false,
         message: 'Geçersiz email veya şifre'
@@ -702,5 +712,54 @@ export const importUsersFromExcel = async (req: Request, res: Response): Promise
       message: 'Excel dosyası işlenirken hata oluştu',
       details: error instanceof Error ? error.message : 'Bilinmeyen hata'
     });
+  }
+}; 
+
+// Default admin kullanıcısını oluştur
+export const createDefaultAdmin = async (): Promise<void> => {
+  try {
+    const defaultEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@koop.org';
+    const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
+
+    // Admin zaten var mı kontrol et
+    const adminCheck = 'SELECT id FROM users WHERE email = $1';
+    const adminResult = await pool.query(adminCheck, [defaultEmail]);
+
+    if (adminResult.rows.length > 0) {
+      console.log('🔑 Default admin zaten mevcut:', defaultEmail);
+      return;
+    }
+
+    // Şifreyi hash'le
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
+
+    // Default admin oluştur
+    const insertQuery = `
+      INSERT INTO users (email, password, first_name, last_name, phone_number, profession, role, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+      RETURNING id, email, first_name, last_name, role
+    `;
+
+    const values = [
+      defaultEmail,
+      hashedPassword,
+      'System',
+      'Administrator',
+      '5555555555',
+      'System Admin',
+      'admin'
+    ];
+
+    const result = await pool.query(insertQuery, values);
+    const newAdmin = result.rows[0];
+
+    console.log('✅ Default admin oluşturuldu:');
+    console.log(`   Email: ${newAdmin.email}`);
+    console.log(`   Password: ${defaultPassword}`);
+    console.log(`   Role: ${newAdmin.role}`);
+
+  } catch (error) {
+    console.error('❌ Default admin oluşturulurken hata:', error);
   }
 }; 
