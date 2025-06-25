@@ -62,7 +62,7 @@ function RecentDocumentsCard() {
   const loadDocuments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`/documents', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -83,7 +83,7 @@ function RecentDocumentsCard() {
 
   const openDocument = async (document: Document) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`/documents/file/${document.file_name}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents/file/${document.file_name}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -158,6 +158,8 @@ function RecentDocumentsCard() {
   );
 }
 
+
+
 function SidebarDocuments() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,7 +171,7 @@ function SidebarDocuments() {
   const loadDocuments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`/documents', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -190,7 +192,7 @@ function SidebarDocuments() {
 
   const openDocument = async (document: Document) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`/documents/file/${document.file_name}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/documents/file/${document.file_name}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -289,7 +291,7 @@ function SidebarDocuments() {
 
 
 
-export default function MemberDashboard() {
+function MemberDashboard() {
   const [dashboardData, setDashboardData] = useState<MemberDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1051,4 +1053,6 @@ export default function MemberDashboard() {
       )}
     </div>
   );
-} 
+}
+
+export default MemberDashboard;

@@ -279,7 +279,7 @@ export default function AdminFeesPage() {
       // Loading göster
       showSuccess('İşlem Başladı', 'Excel dosyası hazırlanıyor...');
 
-      const response = await fetch('${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}`/`/export/fees', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/export/fees`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
