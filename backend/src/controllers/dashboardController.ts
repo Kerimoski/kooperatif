@@ -85,34 +85,34 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
       WHERE status = 'pending'
     `;
 
-    // Belge istatistikleri
+    // Belge istatistikleri - boş tablo için güvenli sorgu
     const documentStatsQuery = `
       SELECT 
-        COUNT(*) as total_documents,
-        COUNT(CASE WHEN uploaded_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as new_documents_this_month,
-        SUM(file_size) as total_size,
-        COUNT(DISTINCT category) as categories_count
+        COALESCE(COUNT(*), 0) as total_documents,
+        COALESCE(COUNT(CASE WHEN uploaded_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END), 0) as new_documents_this_month,
+        COALESCE(SUM(file_size), 0) as total_size,
+        COALESCE(COUNT(DISTINCT category), 0) as categories_count
       FROM documents
     `;
 
-    // Mail/rapor istatistikleri  
+    // Mail/rapor istatistikleri - boş tablo için güvenli sorgu
     const mailStatsQuery = `
       SELECT 
-        COUNT(*) as total_mails,
-        COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent_mails,
-        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_mails,
-        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as mails_this_month
+        COALESCE(COUNT(*), 0) as total_mails,
+        COALESCE(COUNT(CASE WHEN status = 'sent' THEN 1 END), 0) as sent_mails,
+        COALESCE(COUNT(CASE WHEN status = 'failed' THEN 1 END), 0) as failed_mails,
+        COALESCE(COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END), 0) as mails_this_month
       FROM mail_logs
     `;
 
-    // Ödeme/aidat istatistikleri
+    // Ödeme/aidat istatistikleri - boş tablo için güvenli sorgu
     const feeStatsQuery = `
       SELECT 
-        COUNT(*) as total_fees,
-        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_fees,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_fees,
-        COUNT(CASE WHEN status = 'overdue' THEN 1 END) as overdue_fees,
-        SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as total_collected
+        COALESCE(COUNT(*), 0) as total_fees,
+        COALESCE(COUNT(CASE WHEN status = 'paid' THEN 1 END), 0) as paid_fees,
+        COALESCE(COUNT(CASE WHEN status = 'pending' THEN 1 END), 0) as pending_fees,
+        COALESCE(COUNT(CASE WHEN status = 'overdue' THEN 1 END), 0) as overdue_fees,
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as total_collected
       FROM membership_fees
     `;
 
