@@ -82,17 +82,15 @@ print_status "Proje dizini oluşturuluyor..."
 mkdir -p $PROJECT_DIR
 cd $PROJECT_DIR
 
-# 5. Clone or update project
+# 5. Clone project from GitHub
 if [ ! -d ".git" ]; then
-    print_status "Proje dosyaları kopyalanıyor..."
-    # If running locally, copy current directory
-    if [ -f "/Users/kerimoski/Desktop/koop/package.json" ]; then
-        cp -r /Users/kerimoski/Desktop/koop/* .
-        cp /Users/kerimoski/Desktop/koop/.gitignore . 2>/dev/null || true
-    else
-        print_warning "Git repository URL'ini manuel olarak eklemelisiniz"
-        print_warning "Örnek: git clone https://github.com/username/koop.git ."
-    fi
+    print_status "GitHub'dan proje dosyaları indiriliyor..."
+    git clone https://github.com/Kerimoski/kooperatif.git .
+    print_success "Proje GitHub'dan başarıyla indirildi"
+else
+    print_status "Mevcut repository güncelleniyor..."
+    git pull origin main
+    print_success "Repository güncellendi"
 fi
 
 # 6. Backend Setup
