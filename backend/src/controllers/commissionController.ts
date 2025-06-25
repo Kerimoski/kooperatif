@@ -26,6 +26,7 @@ export const getAllCommissions = async (req: Request, res: Response): Promise<vo
 
     const result = await pool.query(query, [userId]);
     
+    
     res.json({
       success: true,
       data: result.rows
@@ -602,6 +603,297 @@ export const rejectApplication = async (req: Request, res: Response): Promise<vo
     res.status(500).json({
       success: false,
       message: 'Başvuru reddedilemedi'
+    });
+  }
+};
+
+// ================== KOMISYON LİNK YÖNETİMİ ==================
+
+// Komisyon linklerini getir (sadece komisyon üyeleri)
+export const getCommissionLinks = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { commissionId } = req.params;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
+
+    // Admin kullanıcılar veya komisyon üyeleri linkleri görebilir
+    const isAdmin = userRole === 'admin';
+    
+    if (!isAdmin) {
+      // Kullanıcının bu komisyonun üyesi olup olmadığını kontrol et
+      const memberCheck = await pool.query(
+        'SELECT id FROM commission_members WHERE commission_id = $1 AND user_id = $2 AND status = $3',
+        [commissionId, userId, 'active']
+      );
+
+      if (memberCheck.rows.length === 0) {
+        res.status(403).json({
+          success: false,
+          message: 'Bu komisyonun linklerini görme yetkiniz yok - komisyon üyesi değilsiniz'
+        });
+        return;
+      }
+    }
+
+    // Komisyon linklerini getir
+    const query = `
+      SELECT 
+        cl.*,
+        u.first_name || ' ' || u.last_name as created_by_name
+      FROM commission_links cl
+      LEFT JOIN users u ON cl.created_by = u.id
+      WHERE cl.commission_id = $1
+      ORDER BY cl.created_at DESC
+    `;
+
+    const result = await pool.query(query, [commissionId]);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+
+  } catch (error) {
+    console.error('Get commission links error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Komisyon linkleri getirilemedi'
+    });
+  }
+};
+
+// Komisyon linki ekle (sadece komisyon yöneticisi veya admin)
+export const addCommissionLink = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { commissionId } = req.params;
+    const { title, url, description } = req.body;
+    const userId = req.user?.userId;
+
+    // URL validasyonu
+    if (!url || !title) {
+      res.status(400).json({
+        success: false,
+        message: 'Başlık ve URL gereklidir'
+      });
+      return;
+    }
+
+    // URL formatını kontrol et
+    try {
+      new URL(url);
+    } catch {
+      res.status(400).json({
+        success: false,
+        message: 'Geçersiz URL formatı'
+      });
+      return;
+    }
+
+    // Kullanıcının admin mi yoksa bu komisyonun yöneticisi mi olduğunu kontrol et
+    const userRole = req.user?.role;
+    const isAdmin = userRole === 'admin';
+    
+    if (!isAdmin) {
+      const managerCheck = await pool.query(
+        'SELECT id FROM commission_members WHERE commission_id = $1 AND user_id = $2 AND role = $3 AND status = $4',
+        [commissionId, userId, 'manager', 'active']
+      );
+
+      if (managerCheck.rows.length === 0) {
+        res.status(403).json({
+          success: false,
+          message: 'Bu komisyona link ekleme yetkiniz yok - komisyon yöneticisi değilsiniz'
+        });
+        return;
+      }
+    }
+
+    // Komisyonun aktif olup olmadığını kontrol et
+    const commissionCheck = await pool.query(
+      'SELECT is_active FROM commissions WHERE id = $1',
+      [commissionId]
+    );
+
+    if (commissionCheck.rows.length === 0 || !commissionCheck.rows[0].is_active) {
+      res.status(404).json({
+        success: false,
+        message: 'Komisyon bulunamadı veya aktif değil'
+      });
+      return;
+    }
+
+    // Linki ekle
+    const insertQuery = `
+      INSERT INTO commission_links (commission_id, title, url, description, created_by)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+
+    const values = [commissionId, title.trim(), url.trim(), description?.trim() || null, userId];
+    const result = await pool.query(insertQuery, values);
+
+    res.status(201).json({
+      success: true,
+      message: 'Link başarıyla eklendi',
+      data: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Add commission link error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Link eklenemedi'
+    });
+  }
+};
+
+// Komisyon linki güncelle (sadece link oluşturan veya komisyon yöneticisi veya admin)
+export const updateCommissionLink = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { commissionId, linkId } = req.params;
+    const { title, url, description } = req.body;
+    const userId = req.user?.userId;
+
+    // URL validasyonu
+    if (!url || !title) {
+      res.status(400).json({
+        success: false,
+        message: 'Başlık ve URL gereklidir'
+      });
+      return;
+    }
+
+    // URL formatını kontrol et
+    try {
+      new URL(url);
+    } catch {
+      res.status(400).json({
+        success: false,
+        message: 'Geçersiz URL formatı'
+      });
+      return;
+    }
+
+    // Link mevcut mu ve bu komisyona ait mi kontrol et
+    const linkCheck = await pool.query(
+      'SELECT created_by FROM commission_links WHERE id = $1 AND commission_id = $2',
+      [linkId, commissionId]
+    );
+
+    if (linkCheck.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Link bulunamadı'
+      });
+      return;
+    }
+
+    const link = linkCheck.rows[0];
+
+    // Yetki kontrolü: link oluşturan, komisyon yöneticisi veya admin
+    const userRole = req.user?.role;
+    const isAdmin = userRole === 'admin';
+    const isLinkOwner = link.created_by === userId;
+
+    if (!isAdmin && !isLinkOwner) {
+      const managerCheck = await pool.query(
+        'SELECT id FROM commission_members WHERE commission_id = $1 AND user_id = $2 AND role = $3 AND status = $4',
+        [commissionId, userId, 'manager', 'active']
+      );
+
+      if (managerCheck.rows.length === 0) {
+        res.status(403).json({
+          success: false,
+          message: 'Bu linki güncelleme yetkiniz yok'
+        });
+        return;
+      }
+    }
+
+    // Linki güncelle
+    const updateQuery = `
+      UPDATE commission_links 
+      SET title = $1, url = $2, description = $3, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4 AND commission_id = $5
+      RETURNING *
+    `;
+
+    const values = [title.trim(), url.trim(), description?.trim() || null, linkId, commissionId];
+    const result = await pool.query(updateQuery, values);
+
+    res.json({
+      success: true,
+      message: 'Link başarıyla güncellendi',
+      data: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Update commission link error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Link güncellenemedi'
+    });
+  }
+};
+
+// Komisyon linki sil (sadece link oluşturan veya komisyon yöneticisi veya admin)
+export const deleteCommissionLink = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { commissionId, linkId } = req.params;
+    const userId = req.user?.userId;
+
+    // Link mevcut mu ve bu komisyona ait mi kontrol et
+    const linkCheck = await pool.query(
+      'SELECT created_by FROM commission_links WHERE id = $1 AND commission_id = $2',
+      [linkId, commissionId]
+    );
+
+    if (linkCheck.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Link bulunamadı'
+      });
+      return;
+    }
+
+    const link = linkCheck.rows[0];
+
+    // Yetki kontrolü: link oluşturan, komisyon yöneticisi veya admin
+    const userRole = req.user?.role;
+    const isAdmin = userRole === 'admin';
+    const isLinkOwner = link.created_by === userId;
+
+    if (!isAdmin && !isLinkOwner) {
+      const managerCheck = await pool.query(
+        'SELECT id FROM commission_members WHERE commission_id = $1 AND user_id = $2 AND role = $3 AND status = $4',
+        [commissionId, userId, 'manager', 'active']
+      );
+
+      if (managerCheck.rows.length === 0) {
+        res.status(403).json({
+          success: false,
+          message: 'Bu linki silme yetkiniz yok'
+        });
+        return;
+      }
+    }
+
+    // Linki sil
+    await pool.query(
+      'DELETE FROM commission_links WHERE id = $1 AND commission_id = $2',
+      [linkId, commissionId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Link başarıyla silindi'
+    });
+
+  } catch (error) {
+    console.error('Delete commission link error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Link silinemedi'
     });
   }
 }; 

@@ -55,3 +55,29 @@ export const upload = multer({
     fileSize: 10 * 1024 * 1024 // 10MB limit
   }
 }); 
+
+// Bellekte sakla (dosyayı diske yazmadan)
+const storageExcel = multer.memoryStorage();
+
+// Dosya türü kontrolü
+const fileFilterExcel = (req: any, file: any, cb: any) => {
+  // Excel dosyalarını kabul et
+  if (
+    file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || // .xlsx
+    file.mimetype === 'application/vnd.ms-excel' || // .xls
+    file.mimetype === 'text/csv' // .csv
+  ) {
+    cb(null, true);
+  } else {
+    cb(new Error('Sadece Excel (.xlsx, .xls) ve CSV dosyaları kabul edilir'), false);
+  }
+};
+
+// Multer yapılandırması
+export const uploadExcel = multer({
+  storage: storageExcel,
+  fileFilter: fileFilterExcel,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+}).single('excel'); // 'excel' field adı 

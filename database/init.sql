@@ -150,3 +150,41 @@ VALUES (
     15,
     1
 ) ON CONFLICT DO NOTHING; 
+
+-- Mail sistemi tablolarını dahil et
+-- Mail logları tablosu
+CREATE TABLE IF NOT EXISTS mail_logs (
+  id SERIAL PRIMARY KEY,
+  sender_id INTEGER REFERENCES users(id),
+  recipient_email VARCHAR(255) NOT NULL,
+  subject VARCHAR(500) NOT NULL,
+  message TEXT NOT NULL,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  sent_at TIMESTAMP,
+  error_message TEXT,
+  mail_type VARCHAR(50) DEFAULT 'announcement' CHECK (mail_type IN ('announcement', 'fee_reminder', 'notification')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Mail logs için indeksler
+CREATE INDEX IF NOT EXISTS idx_mail_logs_recipient ON mail_logs(recipient_email);
+CREATE INDEX IF NOT EXISTS idx_mail_logs_type ON mail_logs(mail_type);
+CREATE INDEX IF NOT EXISTS idx_mail_logs_status ON mail_logs(status);
+CREATE INDEX IF NOT EXISTS idx_mail_logs_sent_at ON mail_logs(sent_at);
+CREATE INDEX IF NOT EXISTS idx_mail_logs_created_at ON mail_logs(created_at);
+
+-- Aidat hatırlatma tablosu
+CREATE TABLE IF NOT EXISTS fee_reminders (
+  id SERIAL PRIMARY KEY,
+  membership_fee_id INTEGER REFERENCES membership_fees(id) ON DELETE CASCADE,
+  reminder_type VARCHAR(20) DEFAULT 'email' CHECK (reminder_type IN ('email', 'sms', 'notification')),
+  sent_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  status VARCHAR(20) DEFAULT 'sent' CHECK (status IN ('sent', 'failed', 'pending')),
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Fee reminders için indeksler
+CREATE INDEX IF NOT EXISTS idx_fee_reminders_fee_id ON fee_reminders(membership_fee_id);
+CREATE INDEX IF NOT EXISTS idx_fee_reminders_type ON fee_reminders(reminder_type);
+CREATE INDEX IF NOT EXISTS idx_fee_reminders_sent_date ON fee_reminders(sent_date); 

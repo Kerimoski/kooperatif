@@ -11,7 +11,11 @@ import {
   demoteManager,
   getPendingApplications,
   approveApplication,
-  rejectApplication
+  rejectApplication,
+  getCommissionLinks,
+  addCommissionLink,
+  updateCommissionLink,
+  deleteCommissionLink
 } from '../controllers/commissionController';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
 
@@ -52,5 +56,19 @@ router.post('/:commissionId/approve/:applicationUserId', authenticateToken, appr
 
 // Başvuruyu reddet (komisyon yöneticisi)
 router.delete('/:commissionId/reject/:applicationUserId', authenticateToken, rejectApplication);
+
+// ================== KOMISYON LİNK YÖNETİMİ ==================
+
+// Komisyon linklerini getir (sadece komisyon üyeleri)
+router.get('/:commissionId/links', authenticateToken, getCommissionLinks);
+
+// Komisyon linki ekle (komisyon yöneticisi veya admin)
+router.post('/:commissionId/links', authenticateToken, addCommissionLink);
+
+// Komisyon linki güncelle (link oluşturan, komisyon yöneticisi veya admin)
+router.put('/:commissionId/links/:linkId', authenticateToken, updateCommissionLink);
+
+// Komisyon linki sil (link oluşturan, komisyon yöneticisi veya admin)
+router.delete('/:commissionId/links/:linkId', authenticateToken, deleteCommissionLink);
 
 export default router; 

@@ -55,3 +55,9 @@ temp/
 
 # Build files
 *.tsbuildinfo 
+backend/.env
+backend/.env.production
+backend/admin_token.txt
+backend/member_token.txt
+backend/logs/
+frontend/.env.local

@@ -525,3 +525,182 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
     });
   }
 }; 
+
+// Excel ile toplu kullanıcı oluşturma
+export const importUsersFromExcel = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const XLSX = require('xlsx');
+    
+    if (!req.file) {
+      res.status(400).json({
+        success: false,
+        message: 'Excel dosyası yüklenmedi'
+      });
+      return;
+    }
+
+    // Excel dosyasını oku
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    
+    // Tüm veriyi al (header_rows olmadan)
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    let successCount = 0;
+    let failedCount = 0;
+    const errors: string[] = [];
+    
+    // Veri başlık satırını bul (ad,soyad,email,telefon,meslek,rol,sifre)
+    let dataStartIndex = -1;
+    for (let i = 0; i < rawData.length; i++) {
+      const row = rawData[i] as any[];
+      if (row && row[0] === 'ad' && row[1] === 'soyad' && row[2] === 'email') {
+        dataStartIndex = i + 1; // Başlık satırının bir sonraki satırından başla
+        break;
+      }
+    }
+    
+    if (dataStartIndex === -1) {
+      res.status(400).json({
+        success: false,
+        message: 'Excel dosyasında geçerli veri formatı bulunamadı. Lütfen template dosyasını kullanın.'
+      });
+      return;
+    }
+
+    // Veri satırlarını işle
+    for (let i = dataStartIndex; i < rawData.length; i++) {
+      const row = rawData[i] as any[];
+      const realRowNumber = i + 1; // Excel satır numarası (1-indexed)
+      
+      // Boş satırları atla
+      if (!row || row.length === 0 || !row[0] || row[0].toString().trim() === '') {
+        continue;
+      }
+      
+      // Açıklama/bilgi/notlar satırlarını atla
+      const firstCell = row[0].toString().trim();
+      if (firstCell.includes('↑') || firstCell.includes('↓') || 
+          firstCell.includes('Örnek') || firstCell.includes('Bu satırı') ||
+          firstCell.includes('NOTLAR') || firstCell.includes('notlar') ||
+          firstCell.includes('-') || firstCell.includes('•') ||
+          firstCell.includes('Email adresleri') || firstCell.includes('Şifreler') ||
+          firstCell.includes('Rol için') || firstCell.includes('Telefon numarası') ||
+          firstCell.length === 0) {
+        continue;
+      }
+
+      // Veri objesini oluştur
+      const userRow = {
+        ad: row[0] ? row[0].toString().trim() : '',
+        soyad: row[1] ? row[1].toString().trim() : '',
+        email: row[2] ? row[2].toString().trim() : '',
+        telefon: row[3] ? row[3].toString().trim() : '',
+        meslek: row[4] ? row[4].toString().trim() : '',
+        rol: row[5] ? row[5].toString().trim() : 'member',
+        sifre: row[6] ? row[6].toString().trim() : ''
+      };
+      
+      // Debug log
+      console.log(`Satır ${realRowNumber} işleniyor:`, {
+        ad: userRow.ad,
+        soyad: userRow.soyad,
+        email: userRow.email,
+        telefon: userRow.telefon,
+        meslek: userRow.meslek,
+        rol: userRow.rol,
+        sifre: userRow.sifre ? '***' : ''
+      });
+
+      try {
+        // Gerekli alanları kontrol et
+        if (!userRow.ad || !userRow.soyad || !userRow.email || !userRow.sifre) {
+          errors.push(`Satır ${realRowNumber}: Ad, soyad, email ve şifre zorunludur`);
+          failedCount++;
+          continue;
+        }
+
+        // Email validasyonu
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(userRow.email)) {
+          errors.push(`Satır ${realRowNumber}: Geçersiz email formatı`);
+          failedCount++;
+          continue;
+        }
+
+        // Şifre validasyonu
+        if (userRow.sifre.length < 6) {
+          errors.push(`Satır ${realRowNumber}: Şifre en az 6 karakter olmalıdır`);
+          failedCount++;
+          continue;
+        }
+
+        // Rol validasyonu
+        const role = userRow.rol || 'member';
+        if (!['member', 'admin'].includes(role)) {
+          errors.push(`Satır ${realRowNumber}: Rol 'member' veya 'admin' olmalıdır`);
+          failedCount++;
+          continue;
+        }
+
+        // Email'in var olup olmadığını kontrol et
+        const existingUserQuery = 'SELECT id FROM users WHERE email = $1';
+        const existingUserResult = await pool.query(existingUserQuery, [userRow.email]);
+        
+        if (existingUserResult.rows.length > 0) {
+          errors.push(`Satır ${realRowNumber}: ${userRow.email} email adresi zaten kullanımda`);
+          failedCount++;
+          continue;
+        }
+
+        // Şifreyi hash'le
+        const hashedPassword = await bcrypt.hash(userRow.sifre, 10);
+
+        // Kullanıcıyı oluştur
+        const insertQuery = `
+          INSERT INTO users (first_name, last_name, email, password, role, is_active, phone_number, profession)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          RETURNING id
+        `;
+
+        const values = [
+          userRow.ad.trim(),
+          userRow.soyad.trim(),
+          userRow.email.trim().toLowerCase(),
+          hashedPassword,
+          role,
+          true,
+          userRow.telefon.trim() || null,
+          userRow.meslek.trim() || null
+        ];
+
+        await pool.query(insertQuery, values);
+        successCount++;
+
+      } catch (error) {
+        console.error(`Satır ${realRowNumber} işlenirken hata:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
+        errors.push(`Satır ${realRowNumber}: ${errorMessage}`);
+        failedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Excel import işlemi tamamlandı',
+      total: successCount + failedCount,
+      successCount: successCount,
+      failed: failedCount,
+      errors: errors.slice(0, 20) // Maksimum 20 hata göster
+    });
+
+  } catch (error) {
+    console.error('Excel import error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Excel dosyası işlenirken hata oluştu',
+      details: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+  }
+}; 

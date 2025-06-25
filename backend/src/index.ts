@@ -12,6 +12,9 @@ import dashboardRoutes from './routes/dashboardRoutes';
 import memberRoutes from './routes/memberRoutes';
 import documentRoutes from './routes/documents';
 import calendarRoutes from './routes/calendarRoutes';
+import membershipRoutes from './routes/membershipRoutes';
+import excelRoutes from './routes/excelRoutes';
+import mailRoutes from './routes/mailRoutes';
 
 // Environment variables yükle
 dotenv.config();
@@ -39,6 +42,9 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/member', memberRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/calendar', calendarRoutes);
+app.use('/api/membership', membershipRoutes);
+app.use('/api/export', excelRoutes);
+app.use('/api/mail', mailRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -1,6 +1,7 @@
 import express from 'express';
-import { login, register, getProfile, updateUser, deleteUser, deactivateUser, changePassword } from '../controllers/authController';
+import { login, register, getProfile, updateUser, deleteUser, deactivateUser, changePassword, importUsersFromExcel } from '../controllers/authController';
 import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { uploadExcel } from '../middleware/upload';
 
 const router = express.Router();
 
@@ -24,5 +25,8 @@ router.patch('/users/:userId/deactivate', authenticateToken, requireAdmin, deact
 
 // Delete user completely (sadece admin)
 router.delete('/users/:userId', authenticateToken, requireAdmin, deleteUser);
+
+// Excel ile toplu kullanıcı oluşturma (sadece admin)
+router.post('/users/excel-import', authenticateToken, requireAdmin, uploadExcel, importUsersFromExcel);
 
 export default router; 

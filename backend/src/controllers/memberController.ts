@@ -58,10 +58,32 @@ export const getMemberDashboard = async (req: Request, res: Response): Promise<v
       LIMIT 5
     `;
 
-    const [commissionsResult, statsResult, activitiesResult] = await Promise.all([
+    // Yaklaşan etkinlikler (önümüzdeki 30 gün)
+    const upcomingEventsQuery = `
+      SELECT 
+        id,
+        title,
+        description,
+        event_type,
+        start_date,
+        end_date,
+        start_time,
+        end_time,
+        is_all_day,
+        location,
+        color
+      FROM calendar_events 
+      WHERE start_date >= CURRENT_DATE 
+        AND start_date <= CURRENT_DATE + INTERVAL '30 days'
+      ORDER BY start_date ASC, start_time ASC
+      LIMIT 8
+    `;
+
+    const [commissionsResult, statsResult, activitiesResult, upcomingEventsResult] = await Promise.all([
       pool.query(commissionsQuery, [userId]),
       pool.query(statsQuery, [userId]),
-      pool.query(activitiesQuery, [userId])
+      pool.query(activitiesQuery, [userId]),
+      pool.query(upcomingEventsQuery)
     ]);
 
     res.json({
@@ -69,7 +91,8 @@ export const getMemberDashboard = async (req: Request, res: Response): Promise<v
       data: {
         commissions: commissionsResult.rows,
         stats: statsResult.rows[0],
-        recentActivities: activitiesResult.rows
+        recentActivities: activitiesResult.rows,
+        upcomingEvents: upcomingEventsResult.rows
       }
     });
 
@@ -298,7 +321,7 @@ export const leaveCommission = async (req: Request, res: Response): Promise<void
   }
 };
 
-// Belirli bir komisyonun detayını ve üyelerini getir (sadece üye olduğu komisyonlar)
+// Belirli bir komisyonun detayını ve üyelerini getir (tüm aktif ortaklar görüntüleyebilir)
 export const getCommissionDetail = async (req: Request, res: Response): Promise<void> => {
   try {
     const { commissionId } = req.params;
@@ -312,38 +335,38 @@ export const getCommissionDetail = async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Üye bu komisyonda mı kontrol et (aktif komisyon ve aktif kullanıcı ve aktif üyelik)
-    const memberCheck = await pool.query(
-      `SELECT cm.id, cm.role, c.is_active as commission_active, u.is_active as user_active, cm.status
-       FROM commission_members cm 
-       JOIN commissions c ON cm.commission_id = c.id
-       JOIN users u ON cm.user_id = u.id
-       WHERE cm.commission_id = $1 AND cm.user_id = $2 AND cm.status = 'active'`,
-      [commissionId, userId]
+    // Kullanıcının aktif olup olmadığını kontrol et
+    const userCheck = await pool.query(
+      'SELECT is_active FROM users WHERE id = $1',
+      [userId]
     );
 
-    if (memberCheck.rows.length === 0) {
-      res.status(403).json({
-        success: false,
-        message: 'Bu komisyonun detaylarını görme yetkiniz yok - komisyon üyesi değilsiniz'
-      });
-      return;
-    }
-
-    const membership = memberCheck.rows[0];
-
-    if (!membership.commission_active) {
-      res.status(404).json({
-        success: false,
-        message: 'Komisyon artık aktif değil'
-      });
-      return;
-    }
-
-    if (!membership.user_active) {
+    if (userCheck.rows.length === 0 || !userCheck.rows[0].is_active) {
       res.status(403).json({
         success: false,
         message: 'Hesabınız aktif değil'
+      });
+      return;
+    }
+
+    // Komisyonun aktif olup olmadığını kontrol et
+    const commissionCheck = await pool.query(
+      'SELECT is_active FROM commissions WHERE id = $1',
+      [commissionId]
+    );
+
+    if (commissionCheck.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'Komisyon bulunamadı'
+      });
+      return;
+    }
+
+    if (!commissionCheck.rows[0].is_active) {
+      res.status(404).json({
+        success: false,
+        message: 'Komisyon artık aktif değil'
       });
       return;
     }
@@ -378,9 +401,27 @@ export const getCommissionDetail = async (req: Request, res: Response): Promise<
       ORDER BY cm.joined_at ASC
     `;
 
-    const [commissionResult, membersResult] = await Promise.all([
+    // Kullanıcının bu komisyonun üyesi olup olmadığını kontrol et (linkler için)
+    const userMembershipQuery = `
+      SELECT id FROM commission_members 
+      WHERE commission_id = $1 AND user_id = $2 AND status = 'active'
+    `;
+
+    // Komisyon linkleri (sadece üyeler için)
+    const linksQuery = `
+      SELECT 
+        cl.*,
+        u.first_name || ' ' || u.last_name as created_by_name
+      FROM commission_links cl
+      LEFT JOIN users u ON cl.created_by = u.id
+      WHERE cl.commission_id = $1
+      ORDER BY cl.created_at DESC
+    `;
+
+    const [commissionResult, membersResult, userMembershipResult] = await Promise.all([
       pool.query(commissionQuery, [commissionId]),
-      pool.query(membersQuery, [commissionId])
+      pool.query(membersQuery, [commissionId]),
+      pool.query(userMembershipQuery, [commissionId, userId])
     ]);
 
     if (commissionResult.rows.length === 0) {
@@ -391,11 +432,22 @@ export const getCommissionDetail = async (req: Request, res: Response): Promise<
       return;
     }
 
+    // Eğer kullanıcı komisyon üyesiyse linkleri de getir
+    let links: any[] = [];
+    const isMember = userMembershipResult.rows.length > 0;
+    
+    if (isMember) {
+      const linksResult = await pool.query(linksQuery, [commissionId]);
+      links = linksResult.rows;
+    }
+
     res.json({
       success: true,
       data: {
         commission: commissionResult.rows[0],
-        members: membersResult.rows
+        members: membersResult.rows,
+        links: links,
+        isMember: isMember
       }
     });
 
